@@ -1,0 +1,70 @@
+{
+ "version": 1,
+ "fichas": [
+  {
+   "id": "mdma",
+   "nombre": "MDMA",
+   "frames": [
+    "data/mdma/f01-mwbigz1m.jpg",
+    "data/mdma/f02-mwbigz1m.jpg",
+    "data/mdma/f03-mwbigz1m.jpg",
+    "data/mdma/f04-mwbigz1m.jpg",
+    "data/mdma/f05-mwbigz1m.jpg",
+    "data/mdma/f06-mwbigz1m.jpg"
+   ],
+   "silueta": "data/mdma/silueta-mwbigtx5.svg",
+   "w": 1200,
+   "h": 510,
+   "pos": {
+    "x": 36.6,
+    "y": 40.8,
+    "w": 34.5
+   }
+  },
+  {
+   "id": "lsd",
+   "nombre": "LSD",
+   "frames": [
+    "data/lsd/f01-mwbihhgq.jpg",
+    "data/lsd/f02-mwbihhgq.jpg",
+    "data/lsd/f03-mwbihhgq.jpg",
+    "data/lsd/f04-mwbihhgq.jpg",
+    "data/lsd/f05-mwbihhgq.jpg",
+    "data/lsd/f06-mwbihhgq.jpg"
+   ],
+   "silueta": "data/lsd/silueta-mwbihbw2.svg",
+   "w": 2814,
+   "h": 3978,
+   "pos": {
+    "x": 68.3,
+    "y": 40.8,
+    "w": 22.5
+   }
+  },
+  {
+   "id": "cocaina",
+   "nombre": "Cocaína",
+   "frames": [
+    "data/cocaina/f01-mwbii3jm.jpg",
+    "data/cocaina/f02-mwbii3jm.jpg",
+    "data/cocaina/f03-mwbii3jm.jpg",
+    "data/cocaina/f04-mwbii3jm.jpg",
+    "data/cocaina/f05-mwbii3jm.jpg",
+    "data/cocaina/f06-mwbii3jm.jpg"
+   ],
+   "silueta": "data/cocaina/silueta-mwbihyxq.svg",
+   "w": 1200,
+   "h": 1386,
+   "pos": {
+    "x": 36.6,
+    "y": 70.3,
+    "w": 22.8
+   }
+  }
+ ],
+ "exhibidor": {
+  "base": "data/exhibidor/base-mwbil5r0.jpg",
+  "w": 2883,
+  "h": 2359
+ }
+}

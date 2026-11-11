@@ -1,0 +1,802 @@
+<!doctype html><html><head><meta charset=utf8><meta name=viewport content="width=device-width,initial-scale=1,viewport-fit=cover"><style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif;background:#fff;color:#000}img{max-width:100%}[hidden]:not([hidden=until-found i]){display:none!important}</style></head><body>
+<title>Fichas lenticulares VC</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@62..125,400..800&family=IBM+Plex+Mono:wght@400;500&display=swap">
+<style>
+/* Layout: visor a pantalla completa (ficha suelta o exhibidor completo); barra superior con modo y estado; barra inferior que despliega los ajustes. */
+:root{
+  --bg:#1f1f25;
+  --stage:#2a2a31;
+  --panel:#111117;
+  --line:#26262f;
+  --fg:#ecebf2;
+  --muted:#9a98a8;
+  --accent:#e8c547;
+  --accent-2:#c75fc9;
+  --ok:#7fd49a;
+  --display:"Archivo", "Helvetica Neue", Arial, sans-serif;
+  --mono:"IBM Plex Mono", ui-monospace, "SF Mono", Menlo, monospace;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%;background:var(--bg);color:var(--fg);overflow:hidden}
+body{font-family:var(--display);font-size:15px;line-height:1.5}
+.app{position:relative;height:100%;overflow:hidden}
+
+.top{
+  position:absolute;top:0;left:0;right:0;z-index:4;
+  display:flex;align-items:center;justify-content:flex-end;gap:12px;
+  padding-top:calc(10px + env(safe-area-inset-top, 0px));padding-bottom:10px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  pointer-events:none;
+}
+.top > *{pointer-events:auto}
+.seg{display:flex;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:rgba(13,13,18,.85)}
+.seg button{font:inherit;font-size:13px;padding:6px 12px;background:transparent;color:var(--muted);border:0;cursor:pointer}
+.seg button[aria-pressed="true"]{background:var(--fg);color:var(--bg);font-weight:600}
+.chip{font-family:var(--mono);font-size:12px;color:var(--muted);background:rgba(13,13,18,.85);border:1px solid var(--line);border-radius:999px;padding:4px 10px}
+.chip.ok{color:var(--ok)}
+.chip.busy{color:var(--accent)}
+.chip.err{color:var(--accent-2)}
+.right{display:flex;align-items:center;gap:10px}
+.zoom{display:flex;align-items:center;border:1px solid var(--line);border-radius:8px;overflow:hidden;background:rgba(13,13,18,.85)}
+.zoom button{font:inherit;font-size:15px;line-height:1;min-width:34px;padding:6px 8px;background:transparent;color:var(--fg);border:0;cursor:pointer}
+.zoom button:hover{background:rgba(255,255,255,.06)}
+.zoom button:focus-visible{outline:2px solid var(--accent);outline-offset:-2px}
+.zoom #zoom-val{font-family:var(--mono);font-size:12px;min-width:58px;color:var(--muted);font-variant-numeric:tabular-nums}
+
+.stage{
+  position:absolute;inset:0;
+  background:radial-gradient(120% 90% at 50% 45%, #35353d 0%, var(--stage) 50%, var(--bg) 100%);
+  perspective:1400px;
+  display:grid;place-items:center;
+  padding-top:56px;padding-bottom:52px;
+  touch-action:none;cursor:grab;user-select:none;-webkit-user-select:none;
+}
+.stage.dragging{cursor:grabbing}
+.stage:focus-visible{outline:2px solid var(--accent);outline-offset:-4px}
+.tilt{transform-style:preserve-3d;will-change:transform;position:relative}
+.solid{position:relative;transform-style:preserve-3d}
+.solid > .card,.solid > .edge{position:absolute;inset:0}
+.edge{-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat;pointer-events:none}
+.ground{position:absolute;inset:6% 4%;background:rgba(0,0,0,.55);filter:blur(24px);border-radius:12px;pointer-events:none}
+
+.card{position:relative;background:#000;-webkit-mask-size:100% 100%;mask-size:100% 100%;-webkit-mask-repeat:no-repeat;mask-repeat:no-repeat}
+.card canvas{position:absolute;inset:0;width:100%;height:100%;display:block}
+.ridges,.glare{position:absolute;inset:0;pointer-events:none}
+.ridges{opacity:.5;mix-blend-mode:overlay}
+.ridges.h{background:repeating-linear-gradient(0deg, rgba(255,255,255,.22) 0 1px, rgba(0,0,0,.18) 1px 2px, transparent 2px 4px)}
+.ridges.v{background:repeating-linear-gradient(90deg, rgba(255,255,255,.22) 0 1px, rgba(0,0,0,.18) 1px 2px, transparent 2px 4px)}
+.glare{mix-blend-mode:screen;background-repeat:no-repeat}
+.ridges.off,.glare.off{display:none}
+
+.board{position:relative;transform-style:preserve-3d}
+.board .face{position:absolute;inset:0;background:#050507}
+.board img.base{position:absolute;inset:0;width:100%;height:100%;object-fit:fill;display:block;pointer-events:none}
+.board .bedge{position:absolute;inset:0;pointer-events:none}
+.board .slot{position:absolute;transform-style:preserve-3d;transition:transform .35s ease;cursor:pointer}
+.board.placing .slot{outline:1px dashed rgba(232,197,71,.7);cursor:move}
+.board.placing .slot.sel{outline:2px solid var(--accent)}
+.board .empty{position:absolute;inset:0;display:grid;place-items:center;color:var(--muted);font-size:14px;text-align:center;padding:16px}
+
+.placeholder{display:grid;place-items:center;text-align:center;color:var(--muted);border:1px dashed #3a3946;border-radius:12px;padding:32px 24px;max-width:420px;font-size:14px}
+.placeholder b{display:block;color:var(--fg);font-size:18px;margin-bottom:6px}
+
+.nav{
+  position:absolute;top:50%;z-index:3;transform:translateY(-50%);
+  width:44px;height:44px;border-radius:50%;border:1px solid var(--line);
+  background:rgba(13,13,18,.85);color:var(--fg);cursor:pointer;display:grid;place-items:center;
+}
+.nav[hidden],.label[hidden]{display:none}
+.nav:hover{border-color:var(--muted)}
+.nav:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
+.nav svg{width:20px;height:20px}
+.nav.prev{left:max(12px, env(safe-area-inset-left, 0px))}
+.nav.next{right:max(12px, env(safe-area-inset-right, 0px))}
+.label{
+  position:absolute;left:0;right:0;bottom:calc(64px + env(safe-area-inset-bottom, 0px));margin:0;z-index:3;
+  text-align:center;font-family:var(--mono);font-size:13px;color:var(--muted);pointer-events:none;
+}
+.label b{color:var(--fg);font-weight:500}
+
+.bar{
+  position:absolute;left:0;right:0;bottom:0;z-index:5;
+  height:calc(52px + env(safe-area-inset-bottom, 0px));
+  padding-bottom:env(safe-area-inset-bottom, 0px);
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+  display:flex;align-items:center;justify-content:center;
+  width:100%;border:0;border-top:1px solid var(--line);
+  background:rgba(13,13,18,.92);color:var(--fg);cursor:pointer;
+  -webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px);
+}
+.bar:hover{background:rgba(22,22,30,.95)}
+.bar:focus-visible{outline:2px solid var(--accent);outline-offset:-3px}
+.bar svg{width:22px;height:22px;transition:transform .25s ease}
+.bar[aria-expanded="true"] svg{transform:rotate(180deg)}
+
+.drawer{
+  position:absolute;left:0;right:0;bottom:calc(52px + env(safe-area-inset-bottom, 0px));z-index:4;
+  max-height:min(74%, 620px);overflow:auto;
+  background:var(--panel);border-top:1px solid var(--line);
+  transform:translateY(calc(100% + 60px));transition:transform .3s ease;
+}
+.drawer.open{transform:none}
+.drawer-in{
+  max-width:1180px;margin:0 auto;display:grid;gap:14px;
+  padding-block:16px 18px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px));
+}
+.status{margin:0;font-family:var(--mono);font-size:14px;font-variant-numeric:tabular-nums;color:var(--fg)}
+.status b{color:var(--accent);font-weight:500}
+.panel{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:12px}
+.box{border:1px solid var(--line);border-radius:10px;padding:12px 14px;display:grid;gap:10px;align-content:start;min-width:0}
+.box h2{margin:0;font-size:12px;font-family:var(--mono);font-weight:500;letter-spacing:.08em;text-transform:uppercase;color:var(--muted)}
+.box .seg{background:transparent}
+.box .seg button{font-size:14px;padding:8px 10px;flex:1}
+.small{margin:0;font-size:13px;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--accent)}
+.row{display:flex;justify-content:space-between;align-items:baseline;gap:8px}
+.row output{font-family:var(--mono);font-size:13px;font-variant-numeric:tabular-nums}
+.check{display:flex;gap:10px;align-items:center;font-size:14px;cursor:pointer}
+.check input{accent-color:var(--accent);width:16px;height:16px}
+label.file{position:relative;display:flex;align-items:center;justify-content:center;border:1px dashed #44434f;border-radius:8px;padding:10px 12px;font-size:14px;cursor:pointer;text-align:center}
+label.file:hover{border-color:var(--accent)}
+label.file input{position:absolute;opacity:0;width:1px;height:1px}
+.btn{font:inherit;font-size:14px;padding:8px 12px;border-radius:8px;border:1px solid var(--line);background:transparent;color:var(--fg);cursor:pointer}
+.btn:hover{border-color:var(--muted)}
+.btn[aria-pressed="true"]{border-color:var(--accent);color:var(--accent)}
+.msg{margin:0;font-size:13px;min-height:1.2em;color:var(--accent-2)}
+.nums{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.nums label{display:grid;gap:4px;font-size:12px;color:var(--muted);font-family:var(--mono)}
+.nums input{width:100%;font:inherit;font-size:13px;font-family:var(--mono);background:#0b0b10;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px}
+select{font:inherit;font-size:14px;background:#0b0b10;color:var(--fg);border:1px solid var(--line);border-radius:6px;padding:6px 8px;width:100%}
+.seg button:focus-visible,.btn:focus-visible,input:focus-visible,select:focus-visible,label.file:focus-within{outline:2px solid var(--accent);outline-offset:2px}
+@media (prefers-reduced-motion: reduce){.drawer,.bar svg{transition:none}}
+</style>
+
+<div class="app">
+  <div class="top">
+    <div class="right">
+      <span class="chip" id="save-chip" hidden></span>
+      <div class="zoom" role="group" aria-label="Zoom">
+        <button type="button" id="zoom-out" aria-label="Alejar">−</button>
+        <button type="button" id="zoom-val" aria-label="Restablecer zoom">100 %</button>
+        <button type="button" id="zoom-in" aria-label="Acercar">+</button>
+      </div>
+    </div>
+  </div>
+
+  <section class="stage" id="stage" tabindex="0" aria-label="Visor lenticular. Arrastrá para inclinar; doble clic para centrar.">
+    <div class="tilt" id="tilt"></div>
+  </section>
+
+  <button type="button" class="nav prev" id="prev" aria-label="Ficha anterior"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M15 6l-6 6 6 6"/></svg></button>
+  <button type="button" class="nav next" id="next" aria-label="Ficha siguiente"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M9 6l6 6-6 6"/></svg></button>
+  <p class="label" id="label"></p>
+
+  <div class="drawer" id="drawer" aria-hidden="true">
+    <div class="drawer-in">
+      <p class="status" id="status" aria-live="polite">Inclinación +0,0°</p>
+      <div class="panel">
+        <div class="box">
+          <h2>Dirección de las lentes</h2>
+          <div class="seg" role="group" aria-label="Dirección de las lentes">
+            <button type="button" id="lens-h" aria-pressed="false">Horizontales</button>
+            <button type="button" id="lens-v" aria-pressed="true">Verticales</button>
+          </div>
+          <p class="small" id="lens-note">Cambia al girarla de costado, por ejemplo al pasar caminando frente al exhibidor.</p>
+        </div>
+
+        <div class="box">
+          <h2>Ángulos</h2>
+          <div class="row"><label for="step">Grados por cuadro</label><output id="step-out" for="step">6°</output></div>
+          <input type="range" id="step" min="2" max="12" step="0.5" value="6">
+          <div class="row"><label for="maxtilt">Inclinación máxima</label><output id="max-out" for="maxtilt">50°</output></div>
+          <input type="range" id="maxtilt" min="15" max="70" step="1" value="50">
+          <p class="small" id="cycle-note">El ciclo completo se recorre en 36° de inclinación.</p>
+        </div>
+
+        <div class="box">
+          <h2>Simulación</h2>
+          <label class="check"><input type="checkbox" id="opt-ridges" checked> Estrías de la lente</label>
+          <label class="check"><input type="checkbox" id="opt-ghost" checked> Fantasma entre cuadros</label>
+          <label class="check"><input type="checkbox" id="opt-parallax" checked> Paralaje entre fichas (exhibidor)</label>
+          <label class="check"><input type="checkbox" id="opt-auto"> Balanceo automático</label>
+          <div class="row"><label for="thick">Espesor</label><output id="thick-out" for="thick">×1</output></div>
+          <input type="range" id="thick" min="1" max="4" step="0.5" value="1">
+          <p class="small">×1 es el espesor real: ficha de 10 mm y base de 15 mm (5 mm de base más 10 mm de capa calada). En el exhibidor, tocá una ficha para sacarla de su hueco.</p>
+        </div>
+
+        <div class="box" id="box-files" hidden>
+          <h2 id="files-title">Archivos de la ficha</h2>
+          <label for="ficha-sel" class="small">Ficha</label>
+          <select id="ficha-sel"></select>
+          <label class="file" for="frames-in">Cargar cuadros (PNG o JPG)<input type="file" id="frames-in" accept="image/*" multiple></label>
+          <label class="file" for="sil-in">Cargar silueta (SVG)<input type="file" id="sil-in" accept=".svg,image/svg+xml"></label>
+          <p class="msg" id="msg"></p>
+          <p class="small">Lo que cargues se guarda en esta página y queda disponible para cualquiera que la abra.</p>
+        </div>
+
+        <div class="box" id="box-exh" hidden>
+          <h2>Exhibidor</h2>
+          <label class="file" for="base-in">Cargar imagen del exhibidor<input type="file" id="base-in" accept="image/*"></label>
+          <button type="button" class="btn" id="place-btn" aria-pressed="false">Ubicar fichas</button>
+          <div class="nums" id="nums">
+            <label>X %<input type="number" id="num-x" step="0.1"></label>
+            <label>Y %<input type="number" id="num-y" step="0.1"></label>
+            <label>Ancho %<input type="number" id="num-w" step="0.1" min="1"></label>
+          </div>
+          <p class="small" id="place-note">Con "Ubicar fichas" activado, arrastrá cada ficha sobre su hueco. Los valores son de la ficha seleccionada y se guardan solos.</p>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <button type="button" class="bar" id="bar" aria-expanded="false" aria-controls="drawer" aria-label="Mostrar ajustes">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 15l6-6 6 6"/></svg>
+  </button>
+</div>
+
+<script>
+(function(){
+  "use strict";
+  const $ = id => document.getElementById(id);
+  const fmt = (v, d) => (d == null ? String(v) : v.toFixed(d)).replace(".", ",");
+  const DEFAULT_FICHAS = [
+    {id:"mdma", nombre:"MDMA"},
+    {id:"lsd", nombre:"LSD"},
+    {id:"cocaina", nombre:"Cocaína"}
+  ];
+  const DEFAULT_POS = {mdma:{x:22,y:50,w:24}, lsd:{x:50,y:50,w:16}, cocaina:{x:78,y:50,w:18}};
+
+  /* ---------- estado ---------- */
+  let manifest = {version:1, fichas: DEFAULT_FICHAS.map(f => ({...f, frames:[], silueta:null, w:0, h:0, pos:{...DEFAULT_POS[f.id]}})), exhibidor:{base:null, w:0, h:0}};
+  const runtime = {};       // id -> {imgs:[], maskUrl:string|null}
+  let baseImg = null;       // HTMLImageElement del exhibidor
+  let mode = "ficha", current = 0, lens = "v", step = 6, maxTilt = 50;
+  let showGhost = true, showRidges = true, parallax = true, autoOn = false;
+  let canEdit = false, artifactNs = null, saveBlocked = false;
+  let placing = false, selected = 0;
+  let pendingFiles = {}, saveTimer = null;
+  let cards = [];           // [{fid, el, solid, cv, ctx, glare, ridges, xNorm, key, maskUrl}]
+  let thickMul = 1;
+  const lifted = new Set();
+  const FICHA_MM = 10, BASE_MM = 15, BASE_W_MM = 1016;
+
+  const stage = $("stage"), tilt = $("tilt"), statusEl = $("status"), msg = $("msg"), chip = $("save-chip");
+  const bar = $("bar"), drawer = $("drawer");
+
+  /* ---------- carga ---------- */
+  function loadImage(src){
+    return new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = () => rej(new Error(src)); im.src = src; });
+  }
+  async function loadManifest(){
+    try{
+      const r = await fetch("data/fichas.json", {cache:"no-store"});
+      if(!r.ok) return;
+      const m = await r.json();
+      if(m && Array.isArray(m.fichas)){
+        DEFAULT_FICHAS.forEach(def => {
+          const got = m.fichas.find(f => f.id === def.id);
+          if(got){
+            const slot = manifest.fichas.find(f => f.id === def.id);
+            Object.assign(slot, got, {pos: {...DEFAULT_POS[def.id], ...(got.pos || {})}});
+          }
+        });
+        if(m.exhibidor) manifest.exhibidor = {...manifest.exhibidor, ...m.exhibidor};
+      }
+    }catch(_){}
+  }
+  async function loadAssets(){
+    await Promise.all(manifest.fichas.map(async f => {
+      const rt = runtime[f.id] = {imgs:[], maskUrl: f.silueta || null};
+      if(f.frames && f.frames.length){
+        try{ rt.imgs = await Promise.all(f.frames.map(loadImage)); }catch(_){ rt.imgs = []; }
+      }
+    }));
+    if(manifest.exhibidor.base){
+      try{ baseImg = await loadImage(manifest.exhibidor.base); }catch(_){ baseImg = null; }
+    }
+  }
+
+  /* ---------- tarjetas ---------- */
+  function makeCard(f){
+    const el = document.createElement("div"); el.className = "card";
+    const cv = document.createElement("canvas");
+    const ridges = document.createElement("div"); ridges.className = "ridges " + lens + (showRidges ? "" : " off");
+    const glare = document.createElement("div"); glare.className = "glare" + (showRidges ? "" : " off");
+    el.append(cv, ridges, glare);
+    const maskUrl = runtime[f.id] && runtime[f.id].maskUrl;
+    applyMask(el, maskUrl);
+    const solid = document.createElement("div"); solid.className = "solid";
+    solid.appendChild(el);
+    return {fid:f.id, el, solid, cv, ctx:cv.getContext("2d"), ridges, glare, xNorm:0.5, key:"", maskUrl, edgesPx:-1};
+  }
+  /* Volumen: capas apiladas detrás del frente, con la misma silueta. */
+  function setEdges(c, px){
+    px = Math.max(0, Math.round(px));
+    if(c.edgesPx === px) return; c.edgesPx = px;
+    c.solid.querySelectorAll(".edge").forEach(e => e.remove());
+    const n = Math.min(px, 40); if(!n) return;
+    const stepZ = px / n;
+    for(let i = n; i >= 1; i--){
+      const e = document.createElement("div"); e.className = "edge";
+      const t = i / n;
+      // la primera capa (lente) es apenas más clara; después, acrílico negro mate
+      const col = i === 1 ? "#34343e" : "rgb(" + Math.round(26 - 12*t) + "," + Math.round(26 - 12*t) + "," + Math.round(31 - 12*t) + ")";
+      e.style.background = col;
+      e.style.transform = "translateZ(" + (-i*stepZ).toFixed(2) + "px)";
+      applyMask(e, c.maskUrl);
+      c.solid.insertBefore(e, c.el);
+    }
+  }
+  function boardEdges(board, px){
+    board.querySelectorAll(".bedge").forEach(e => e.remove());
+    px = Math.max(1, Math.round(px)); const n = Math.min(px, 40), stepZ = px / n;
+    const face = board.querySelector(".face");
+    for(let i = n; i >= 1; i--){
+      const e = document.createElement("div"); e.className = "bedge";
+      const t = i / n;
+      e.style.background = "rgb(" + Math.round(24 - 12*t) + "," + Math.round(24 - 12*t) + "," + Math.round(29 - 12*t) + ")";
+      e.style.transform = "translateZ(" + (-i*stepZ).toFixed(2) + "px)";
+      board.insertBefore(e, face);
+    }
+  }
+  function applyMask(el, url){
+    if(url){ el.style.webkitMaskImage = 'url("' + url + '")'; el.style.maskImage = 'url("' + url + '")'; }
+    else { el.style.webkitMaskImage = ""; el.style.maskImage = ""; }
+  }
+  function ratioOf(f){
+    const rt = runtime[f.id];
+    if(f.w && f.h) return f.w / f.h;
+    if(rt && rt.imgs[0]) return rt.imgs[0].naturalWidth / rt.imgs[0].naturalHeight;
+    return 355/151;
+  }
+  const hasFrames = f => !!(runtime[f.id] && runtime[f.id].imgs.length);
+
+  /* ---------- armado de la vista ---------- */
+  function build(){
+    tilt.innerHTML = ""; cards = [];
+    const visibles = manifest.fichas;
+    if(mode === "ficha"){
+      const f = visibles[current];
+      $("prev").hidden = $("next").hidden = false;
+      $("label").innerHTML = "<b>" + escapeHtml(f.nombre) + "</b> · " + (current+1) + " de " + (visibles.length + 1);
+      if(!hasFrames(f)){
+        const ph = document.createElement("div"); ph.className = "placeholder";
+        ph.innerHTML = "<span><b>" + escapeHtml(f.nombre) + "</b>" + (canEdit ? "Todavía no hay cuadros. Abrí los ajustes con la barra de abajo y cargalos." : "Esta ficha todavía no tiene cuadros cargados.") + "</span>";
+        tilt.appendChild(ph);
+      } else {
+        const c = makeCard(f);
+        const ground = document.createElement("div"); ground.className = "ground"; ground.style.transform = "translateZ(-60px)";
+        c.solid.insertBefore(ground, c.solid.firstChild);
+        tilt.appendChild(c.solid); cards.push(c);
+      }
+    } else {
+      $("prev").hidden = $("next").hidden = false;
+      $("label").innerHTML = "<b>Exhibidor</b> · " + (visibles.length + 1) + " de " + (visibles.length + 1);
+      const board = document.createElement("div"); board.className = "board" + (placing ? " placing" : ""); board.id = "board";
+      const ground = document.createElement("div"); ground.className = "ground"; ground.style.transform = "translateZ(-80px)"; board.appendChild(ground);
+      const face = document.createElement("div"); face.className = "face"; board.appendChild(face);
+      if(baseImg){ const im = document.createElement("img"); im.className = "base"; im.src = baseImg.src; im.alt = ""; face.appendChild(im); }
+      else {
+        const e = document.createElement("div"); e.className = "empty";
+        e.textContent = canEdit ? "Cargá la imagen del exhibidor desde los ajustes. Mientras tanto, las fichas se ven sobre fondo negro." : "";
+        face.appendChild(e);
+      }
+      visibles.forEach((f, i) => {
+        if(!hasFrames(f) && !(placing && canEdit)) return;
+        const slot = document.createElement("div"); slot.className = "slot" + (placing && i === selected ? " sel" : ""); slot.dataset.idx = String(i);
+        const c = makeCard(f); c.xNorm = f.pos.x / 100;
+        slot.appendChild(c.solid); board.appendChild(slot); cards.push(c);
+      });
+      tilt.appendChild(board);
+    }
+    layout(); updateNums();
+  }
+  function layout(){
+    const sw = stage.clientWidth, sh = stage.clientHeight - 56 - 52 - 40;
+    if(mode === "ficha"){
+      const f = manifest.fichas[current]; const r = ratioOf(f);
+      const availW = Math.max(120, sw - 2*72);
+      let w = Math.min(availW, sh * r); let h = w / r;
+      const widthMm = Math.max(50, f.pos.w / 100 * BASE_W_MM);
+      cards.forEach(c => {
+        c.solid.style.width = w + "px"; c.solid.style.height = h + "px";
+        setEdges(c, w * FICHA_MM / widthMm * thickMul); sizeCanvas(c);
+      });
+    } else {
+      const board = $("board"); if(!board) return;
+      const r = baseImg ? baseImg.naturalWidth / baseImg.naturalHeight : BASE_W_MM/830;
+      let w = Math.min(sw - 32, sh * r); let h = w / r;
+      board.style.width = w + "px"; board.style.height = h + "px";
+      const mmPx = w / BASE_W_MM;
+      boardEdges(board, BASE_MM * mmPx * thickMul);
+      board.querySelectorAll(".slot").forEach(slot => {
+        const i = +slot.dataset.idx, f = manifest.fichas[i]; const rr = ratioOf(f);
+        const cw = w * f.pos.w / 100, ch = cw / rr;
+        slot.style.left = f.pos.x + "%"; slot.style.top = f.pos.y + "%";
+        const lift = lifted.has(i) && !placing ? Math.max(30, w * 0.05) : 0;
+        slot.style.transform = "translate(-50%,-50%) translateZ(" + (0.8 + lift).toFixed(1) + "px)";
+        const c = cards.find(cc => cc.solid === slot.firstChild);
+        if(c){ c.solid.style.width = cw + "px"; c.solid.style.height = ch + "px"; setEdges(c, FICHA_MM * mmPx * thickMul); }
+      });
+      cards.forEach(sizeCanvas);
+    }
+  }
+  $("thick").addEventListener("input", e => { thickMul = parseFloat(e.target.value); $("thick-out").textContent = "×" + fmt(thickMul); layout(); });
+  function sizeCanvas(c){
+    const dpr = Math.min((window.devicePixelRatio || 1) * Math.max(1, zoomT), 4);
+    c.cv.width = Math.max(1, Math.round(c.el.offsetWidth * dpr));
+    c.cv.height = Math.max(1, Math.round(c.el.offsetHeight * dpr));
+    c.key = "";
+  }
+  window.addEventListener("resize", layout);
+
+  /* ---------- inclinación ---------- */
+  const cur = {x:0, y:0}, target = {x:0, y:0};
+  let lastInput = -1e9, drag = null;
+
+  /* ---------- zoom y desplazamiento ---------- */
+  let zoom = 1, zoomT = 1, pan = {x:0, y:0}, panT = {x:0, y:0}, resTimer = null;
+  const pointers = new Map(); let pinch = null;
+  const ZMIN = 0.4, ZMAX = 4;
+  function setZoom(z, cx, cy){
+    z = Math.max(ZMIN, Math.min(ZMAX, z));
+    if(cx != null){
+      const r = stage.getBoundingClientRect();
+      const px = cx - (r.left + r.width/2), py = cy - (r.top + r.height/2);
+      panT.x = px - (px - panT.x) * (z / zoomT);
+      panT.y = py - (py - panT.y) * (z / zoomT);
+    } else { panT.x *= z / zoomT; panT.y *= z / zoomT; }
+    zoomT = z;
+    if(zoomT <= 1.001 && cx == null){ panT.x = 0; panT.y = 0; }
+    $("zoom-val").textContent = Math.round(zoomT*100) + " %";
+    clearTimeout(resTimer); resTimer = setTimeout(() => cards.forEach(sizeCanvas), 250);
+  }
+  function resetView(){ target.x = 0; target.y = 0; panT.x = 0; panT.y = 0; setZoom(1); }
+  $("zoom-in").addEventListener("click", () => setZoom(zoomT * 1.25));
+  $("zoom-out").addEventListener("click", () => setZoom(zoomT / 1.25));
+  $("zoom-val").addEventListener("click", resetView);
+  stage.addEventListener("wheel", e => {
+    e.preventDefault();
+    setZoom(zoomT * Math.exp(-e.deltaY * (e.ctrlKey ? 0.01 : 0.0015)), e.clientX, e.clientY);
+  }, {passive:false});
+  const clamp = v => Math.max(-maxTilt, Math.min(maxTilt, v));
+  const DRAG_SENS = 0.2;
+
+  const midOf = () => { const p = [...pointers.values()]; return {x:(p[0].x+p[1].x)/2, y:(p[0].y+p[1].y)/2, d:Math.hypot(p[0].x-p[1].x, p[0].y-p[1].y)}; };
+  stage.addEventListener("pointerdown", e => {
+    pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pointers.size === 2){
+      const m = midOf(); pinch = {d0:Math.max(1, m.d), z0:zoomT, last:m};
+      drag = null; stage.classList.remove("dragging"); stage.setPointerCapture(e.pointerId); return;
+    }
+    if(e.button === 1 || (e.shiftKey && e.button === 0)){
+      drag = {pan:true, x:e.clientX, y:e.clientY}; stage.setPointerCapture(e.pointerId); stage.classList.add("dragging"); e.preventDefault(); return;
+    }
+    if(e.button !== undefined && e.button !== 0) return;
+    const slot = e.target.closest && e.target.closest(".slot");
+    if(placing && slot && canEdit){
+      const i = +slot.dataset.idx; selected = i; markSelected();
+      const board = $("board").getBoundingClientRect();
+      drag = {placing:true, idx:i, bx:board.left, by:board.top, bw:board.width, bh:board.height};
+      stage.setPointerCapture(e.pointerId); e.preventDefault(); return;
+    }
+    drag = {x:e.clientX, y:e.clientY, tx:target.x, ty:target.y, slot: (mode === "exh" && slot) ? +slot.dataset.idx : -1, moved:0};
+    stage.setPointerCapture(e.pointerId); stage.classList.add("dragging"); lastInput = performance.now();
+  });
+  stage.addEventListener("pointermove", e => {
+    if(pointers.has(e.pointerId)) pointers.set(e.pointerId, {x:e.clientX, y:e.clientY});
+    if(pinch && pointers.size >= 2){
+      const m = midOf();
+      setZoom(pinch.z0 * m.d / pinch.d0, m.x, m.y);
+      panT.x += m.x - pinch.last.x; panT.y += m.y - pinch.last.y; pinch.last = m;
+      return;
+    }
+    if(!drag) return;
+    if(drag.pan){
+      panT.x += e.clientX - drag.x; panT.y += e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; return;
+    }
+    if(drag.placing){
+      const f = manifest.fichas[drag.idx];
+      f.pos.x = round1(Math.max(0, Math.min(100, (e.clientX - drag.bx) / drag.bw * 100)));
+      f.pos.y = round1(Math.max(0, Math.min(100, (e.clientY - drag.by) / drag.bh * 100)));
+      layout(); updateNums(); return;
+    }
+    drag.moved = Math.max(drag.moved, Math.abs(e.clientX - drag.x) + Math.abs(e.clientY - drag.y));
+    target.y = clamp(drag.ty + (e.clientX - drag.x)*DRAG_SENS);
+    target.x = clamp(drag.tx - (e.clientY - drag.y)*DRAG_SENS);
+    lastInput = performance.now();
+  });
+  const endDrag = e => {
+    if(e && e.pointerId != null) pointers.delete(e.pointerId);
+    if(pinch){ if(pointers.size < 2) pinch = null; drag = null; return; }
+    if(drag && drag.pan){ drag = null; stage.classList.remove("dragging"); return; }
+    if(drag && drag.placing){ queueManifestSave(); }
+    else if(drag && drag.slot >= 0 && drag.moved < 6){
+      if(lifted.has(drag.slot)) lifted.delete(drag.slot); else lifted.add(drag.slot);
+      target.x = drag.tx; target.y = drag.ty; layout();
+    }
+    drag = null; stage.classList.remove("dragging"); lastInput = performance.now();
+  };
+  stage.addEventListener("pointerup", endDrag);
+  stage.addEventListener("pointercancel", endDrag);
+  stage.addEventListener("dblclick", () => { if(!placing) resetView(); });
+  document.addEventListener("keydown", e => {
+    const tag = (e.target && e.target.tagName) || "";
+    if(tag === "INPUT" || tag === "SELECT" || tag === "TEXTAREA") return;
+    if(e.key === "ArrowLeft"){ go(-1); e.preventDefault(); }
+    else if(e.key === "ArrowRight"){ go(1); e.preventDefault(); }
+    else if(e.key === "0"){ resetView(); }
+    else if(e.key === "+" || e.key === "="){ setZoom(zoomT * 1.25); }
+    else if(e.key === "-" || e.key === "_"){ setZoom(zoomT / 1.25); }
+  });
+  const round1 = v => Math.round(v*10)/10;
+
+  function render(now){
+    if(autoOn && !drag && now - lastInput > 2500){
+      const t = now/1000, main = Math.sin(t*0.5)*Math.min(maxTilt, 30), side = Math.sin(t*0.33+1)*4;
+      if(lens === "h"){ target.x = main; target.y = side; } else { target.y = main; target.x = side; }
+    }
+    cur.x += (target.x - cur.x)*0.15; cur.y += (target.y - cur.y)*0.15;
+    zoom += (zoomT - zoom)*0.2; pan.x += (panT.x - pan.x)*0.25; pan.y += (panT.y - pan.y)*0.25;
+    tilt.style.transform = "translate(" + pan.x.toFixed(1) + "px," + pan.y.toFixed(1) + "px) scale(" + zoom.toFixed(4) + ") rotateX(" + cur.x.toFixed(2) + "deg) rotateY(" + cur.y.toFixed(2) + "deg)";
+    const a = lens === "h" ? cur.x : cur.y;
+    let firstInfo = null;
+    for(const c of cards){
+      const rt = runtime[c.fid]; if(!rt || !rt.imgs.length) continue;
+      const n = rt.imgs.length;
+      const off = (mode === "exh" && parallax) ? (c.xNorm - 0.5) * 2 * step : 0;
+      const t = (a + off)/step + Math.floor(n/2) + 0.5;
+      const kf = Math.floor(t), frac = t - kf, idx = ((kf % n) + n) % n;
+      let gIdx = -1, gA = 0;
+      if(showGhost){
+        if(frac > 0.85){ gIdx = (idx+1) % n; gA = (frac-0.85)/0.15*0.3; }
+        else if(frac < 0.15){ gIdx = (idx-1+n) % n; gA = (0.15-frac)/0.15*0.3; }
+      }
+      const key = idx + "|" + gIdx + "|" + gA.toFixed(2) + "|" + c.cv.width + "x" + c.cv.height;
+      if(key !== c.key){
+        c.key = key;
+        c.ctx.globalAlpha = 1; c.ctx.drawImage(rt.imgs[idx], 0, 0, c.cv.width, c.cv.height);
+        if(gIdx >= 0 && gA > 0.01){ c.ctx.globalAlpha = gA; c.ctx.drawImage(rt.imgs[gIdx], 0, 0, c.cv.width, c.cv.height); c.ctx.globalAlpha = 1; }
+      }
+      if(showRidges){
+        const pos = 50 + a*1.8, dir = lens === "h" ? "180deg" : "90deg";
+        c.glare.style.background = "linear-gradient(" + dir + ", transparent " + (pos-22) + "%, rgba(255,255,255,.18) " + pos + "%, transparent " + (pos+22) + "%)";
+      }
+      if(!firstInfo) firstInfo = {idx, n};
+    }
+    const angTxt = (a>=0?"+":"") + fmt(a, 1) + "°";
+    const info = mode === "ficha" && firstInfo ? "Cuadro <b>" + (firstInfo.idx+1) + "</b> de " + firstInfo.n + " · " : "";
+    const html = info + "Inclinación " + angTxt;
+    if(statusEl._last !== html){ statusEl.innerHTML = html; statusEl._last = html; }
+    requestAnimationFrame(render);
+  }
+
+  /* ---------- navegación y modos ---------- */
+  function go(d){
+    const n = manifest.fichas.length, total = n + 1;
+    let p = mode === "exh" ? n : current;
+    p = (p + d + total) % total;
+    if(p === n){ setMode("exh"); return; }
+    current = p;
+    if(mode === "exh"){ setMode("ficha"); syncSelector(); return; }
+    syncSelector(); build();
+  }
+  $("prev").addEventListener("click", () => go(-1));
+  $("next").addEventListener("click", () => go(1));
+  function setMode(m){
+    mode = m;
+    if(m !== "exh" && placing){ setPlacing(false); return; }
+    build();
+  }
+
+  function setDrawer(open){
+    drawer.classList.toggle("open", open);
+    drawer.setAttribute("aria-hidden", String(!open));
+    bar.setAttribute("aria-expanded", String(open));
+    bar.setAttribute("aria-label", open ? "Ocultar ajustes" : "Mostrar ajustes");
+  }
+  bar.addEventListener("click", () => setDrawer(!drawer.classList.contains("open")));
+
+  function setLens(v){
+    lens = v;
+    $("lens-h").setAttribute("aria-pressed", String(v === "h"));
+    $("lens-v").setAttribute("aria-pressed", String(v === "v"));
+    $("lens-note").textContent = v === "h"
+      ? "Cambia al inclinarla hacia arriba o hacia abajo, y al acercarse al exhibidor a 45°."
+      : "Cambia al girarla de costado, por ejemplo al pasar caminando frente al exhibidor.";
+    cards.forEach(c => { c.ridges.className = "ridges " + v + (showRidges ? "" : " off"); c.key = ""; });
+  }
+  $("lens-h").addEventListener("click", () => setLens("h"));
+  $("lens-v").addEventListener("click", () => setLens("v"));
+  function updateNotes(){
+    $("step-out").textContent = fmt(step) + "°";
+    $("max-out").textContent = maxTilt + "°";
+    $("cycle-note").textContent = "El ciclo completo se recorre en " + fmt(step*6) + "° de inclinación.";
+  }
+  $("step").addEventListener("input", e => { step = parseFloat(e.target.value); updateNotes(); cards.forEach(c => c.key = ""); });
+  $("maxtilt").addEventListener("input", e => { maxTilt = parseInt(e.target.value, 10); target.x = clamp(target.x); target.y = clamp(target.y); updateNotes(); });
+  $("opt-ridges").addEventListener("change", e => { showRidges = e.target.checked; cards.forEach(c => { c.ridges.classList.toggle("off", !showRidges); c.glare.classList.toggle("off", !showRidges); }); });
+  $("opt-ghost").addEventListener("change", e => { showGhost = e.target.checked; cards.forEach(c => c.key = ""); });
+  $("opt-parallax").addEventListener("change", e => { parallax = e.target.checked; cards.forEach(c => c.key = ""); });
+  $("opt-auto").addEventListener("change", e => { autoOn = e.target.checked; lastInput = -1e9; });
+
+  /* ---------- ubicación en el exhibidor ---------- */
+  function setPlacing(on){
+    placing = on; $("place-btn").setAttribute("aria-pressed", String(on));
+    $("place-btn").textContent = on ? "Terminar de ubicar" : "Ubicar fichas";
+    if(on) setMode("exh"); else build();
+  }
+  $("place-btn").addEventListener("click", () => setPlacing(!placing));
+  function markSelected(){
+    document.querySelectorAll(".slot").forEach(s => s.classList.toggle("sel", placing && +s.dataset.idx === selected));
+    syncSelector(); updateNums();
+  }
+  function updateNums(){
+    const f = manifest.fichas[mode === "exh" ? selected : current];
+    if(!f) return;
+    $("num-x").value = f.pos.x; $("num-y").value = f.pos.y; $("num-w").value = f.pos.w;
+  }
+  ["num-x","num-y","num-w"].forEach(id => $(id).addEventListener("change", e => {
+    const f = manifest.fichas[mode === "exh" ? selected : current];
+    const v = parseFloat(String(e.target.value).replace(",", "."));
+    if(!isFinite(v)) return;
+    const k = id === "num-x" ? "x" : id === "num-y" ? "y" : "w";
+    f.pos[k] = k === "w" ? Math.max(1, Math.min(100, v)) : Math.max(0, Math.min(100, v));
+    layout(); queueManifestSave();
+  }));
+
+  /* ---------- selector de ficha para archivos ---------- */
+  const sel = $("ficha-sel");
+  function syncSelector(){
+    sel.innerHTML = "";
+    manifest.fichas.forEach((f, i) => { const o = document.createElement("option"); o.value = String(i); o.textContent = f.nombre; sel.appendChild(o); });
+    sel.value = String(mode === "exh" ? selected : current);
+  }
+  sel.addEventListener("change", () => {
+    const i = +sel.value;
+    if(mode === "exh"){ selected = i; markSelected(); } else { current = i; build(); }
+  });
+  const fichaForFiles = () => manifest.fichas[+sel.value];
+
+  /* ---------- compresión y guardado ---------- */
+  function toJpeg(img, maxSide){
+    const s = Math.min(1, maxSide / Math.max(img.naturalWidth, img.naturalHeight));
+    const c = document.createElement("canvas");
+    c.width = Math.round(img.naturalWidth*s); c.height = Math.round(img.naturalHeight*s);
+    const g = c.getContext("2d"); g.fillStyle = "#000"; g.fillRect(0,0,c.width,c.height);
+    g.drawImage(img, 0, 0, c.width, c.height);
+    return new Promise(res => c.toBlob(b => res(b), "image/jpeg", 0.88));
+  }
+  function fileToImage(file){
+    return new Promise((res, rej) => {
+      const url = URL.createObjectURL(file), im = new Image();
+      im.onload = () => res(im); im.onerror = () => { URL.revokeObjectURL(url); rej(new Error(file.name)); };
+      im.src = url;
+    });
+  }
+  const rev = () => Date.now().toString(36);
+
+  function setChip(text, cls){ chip.hidden = !text; chip.textContent = text || ""; chip.className = "chip" + (cls ? " " + cls : ""); }
+  function queueSave(files){
+    Object.assign(pendingFiles, files);
+    pendingFiles["data/fichas.json"] = {content: JSON.stringify(manifest, null, 1), contentType:"application/json"};
+    setChip("Cambios sin guardar…", "busy");
+    clearTimeout(saveTimer); saveTimer = setTimeout(flushSave, 1500);
+  }
+  const queueManifestSave = () => queueSave({});
+  async function flushSave(){
+    if(saveBlocked || !artifactNs){ setChip("No se puede guardar desde esta vista", "err"); return; }
+    const files = pendingFiles; pendingFiles = {};
+    files["data/fichas.json"] = {content: JSON.stringify(manifest, null, 1), contentType:"application/json"};
+    setChip("Guardando…", "busy");
+    try{
+      await artifactNs.publish(files);
+      setChip("Guardado", "ok"); setTimeout(() => { if(chip.textContent === "Guardado") setChip(""); }, 2500);
+    }catch(err){
+      const code = err && err.code;
+      if(code === "conflict"){ setChip("Se actualizó desde otra vista; recargando", "busy"); return; }
+      if(code === "not_writer" || code === "not_granted" || code === "capability_disabled" || code === "not_declared" || code === "consent_required"){
+        saveBlocked = true; setChip("Esta vista no puede guardar", "err");
+        msg.textContent = "No se pudo guardar desde acá. Lo que cargaste se ve solo en esta pestaña.";
+        return;
+      }
+      if(code === "too_large"){ setChip("Archivos demasiado grandes", "err"); msg.textContent = "Los archivos superan el límite. Reducí los renders (por ejemplo a 1600 px) y volvé a cargarlos."; return; }
+      if(code === "rate_limited"){ Object.assign(pendingFiles, files); setChip("Esperando para guardar…", "busy"); saveTimer = setTimeout(flushSave, 8000); return; }
+      Object.assign(pendingFiles, files); setChip("No se guardó. Reintento en unos segundos", "err"); saveTimer = setTimeout(flushSave, 6000);
+    }
+  }
+
+  $("frames-in").addEventListener("change", async e => {
+    const f = fichaForFiles();
+    const files = Array.from(e.target.files || []).sort((a,b)=>a.name.localeCompare(b.name, undefined, {numeric:true}));
+    e.target.value = "";
+    if(files.length < 2 || files.length > 12){ msg.textContent = "Elegí entre 2 y 12 imágenes (normalmente son 6)."; return; }
+    msg.textContent = "Procesando " + files.length + " cuadros de " + f.nombre + "…";
+    try{
+      const imgs = await Promise.all(files.map(fileToImage));
+      const w0 = imgs[0].naturalWidth, h0 = imgs[0].naturalHeight;
+      const mismatch = imgs.some(im => im.naturalWidth !== w0 || im.naturalHeight !== h0);
+      const r = rev(), out = {}, paths = [];
+      (f.frames || []).forEach(p => { out[p] = null; });
+      const blobs = await Promise.all(imgs.map(im => toJpeg(im, 1600)));
+      blobs.forEach((b, i) => { const p = "data/" + f.id + "/f" + String(i+1).padStart(2,"0") + "-" + r + ".jpg"; paths.push(p); out[p] = b; });
+      f.frames = paths; f.w = w0; f.h = h0;
+      runtime[f.id] = runtime[f.id] || {imgs:[], maskUrl:null};
+      runtime[f.id].imgs = await Promise.all(blobs.map(b => loadImage(URL.createObjectURL(b))));
+      msg.textContent = "Cargados " + files.length + " cuadros de " + f.nombre + " (" + w0 + " × " + h0 + " px)." + (mismatch ? " Atención: no todos los cuadros miden lo mismo." : "");
+      queueSave(out); build();
+    }catch(err){ msg.textContent = "No se pudo abrir " + err.message + ". Exportalo de nuevo como PNG o JPG."; }
+  });
+
+  $("sil-in").addEventListener("change", async e => {
+    const f = fichaForFiles(); const file = (e.target.files || [])[0]; e.target.value = "";
+    if(!file) return;
+    const txt = await file.text();
+    if(!/<svg[\s>]/i.test(txt)){ msg.textContent = "El archivo no parece un SVG. Exportalo desde Illustrator como SVG."; return; }
+    let svgRatio = null;
+    try{
+      const svg = new DOMParser().parseFromString(txt, "image/svg+xml").documentElement;
+      const vb = (svg.getAttribute("viewBox") || "").trim().split(/[\s,]+/).map(Number);
+      if(vb.length === 4 && vb[2] > 0 && vb[3] > 0) svgRatio = vb[2]/vb[3];
+      else { const w = parseFloat(svg.getAttribute("width")), h = parseFloat(svg.getAttribute("height")); if(w > 0 && h > 0) svgRatio = w/h; }
+    }catch(_){}
+    const out = {}; if(f.silueta) out[f.silueta] = null;
+    const p = "data/" + f.id + "/silueta-" + rev() + ".svg";
+    out[p] = {content: txt, contentType:"image/svg+xml"};
+    f.silueta = p;
+    runtime[f.id] = runtime[f.id] || {imgs:[], maskUrl:null};
+    runtime[f.id].maskUrl = URL.createObjectURL(new Blob([txt], {type:"image/svg+xml"}));
+    const r = ratioOf(f);
+    msg.textContent = (svgRatio && Math.abs(svgRatio/r - 1) > 0.02)
+      ? "Silueta guardada, pero su proporción no coincide con la de los cuadros, así que se va a deformar. Exportala desde una mesa de trabajo del mismo tamaño que el render."
+      : "Silueta de " + f.nombre + " guardada.";
+    queueSave(out); build();
+  });
+
+  $("base-in").addEventListener("change", async e => {
+    const file = (e.target.files || [])[0]; e.target.value = "";
+    if(!file) return;
+    try{
+      const im = await fileToImage(file);
+      const b = await toJpeg(im, 2600);
+      const out = {}; if(manifest.exhibidor.base) out[manifest.exhibidor.base] = null;
+      const p = "data/exhibidor/base-" + rev() + ".jpg"; out[p] = b;
+      manifest.exhibidor = {base:p, w:im.naturalWidth, h:im.naturalHeight};
+      baseImg = await loadImage(URL.createObjectURL(b));
+      msg.textContent = "Imagen del exhibidor guardada. Activá \"Ubicar fichas\" para ponerlas en sus huecos.";
+      queueSave(out); if(mode !== "exh") setMode("exh"); else build();
+    }catch(err){ msg.textContent = "No se pudo abrir la imagen del exhibidor."; }
+  });
+
+  function escapeHtml(s){ return String(s).replace(/[&<>"']/g, ch => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[ch])); }
+
+  /* ---------- inicio ---------- */
+  async function initEdit(){
+    try{
+      if(!window.claude || !window.claude.use) return;
+      const [user, art] = await Promise.all([window.claude.use("user"), window.claude.use("artifact")]);
+      artifactNs = art;
+      canEdit = !!(user && art && await user.canEdit());
+    }catch(_){ canEdit = false; }
+    $("box-files").hidden = !canEdit; $("box-exh").hidden = !canEdit;
+    build();
+  }
+
+  (async function start(){
+    updateNotes(); setLens("v"); syncSelector();
+    build();
+    requestAnimationFrame(render);
+    await loadManifest();
+    await loadAssets();
+    syncSelector(); build();
+    initEdit();
+  })();
+})();
+</script>
+
+</body></html>
