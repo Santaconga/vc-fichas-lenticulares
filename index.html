@@ -318,6 +318,8 @@ select{font:inherit;font-size:14px;background:#0b0b10;color:var(--fg);border:1px
   function setEdges(c, px){
     px = Math.max(0, Math.round(px));
     if(c.edgesPx === px) return; c.edgesPx = px;
+    // el frente se adelanta unos píxeles para que no se pelee con la primera capa del canto (titileo)
+    c.el.style.transform = "translateZ(" + Math.max(3, px * 0.1).toFixed(1) + "px)";
     c.solid.querySelectorAll(".edge").forEach(e => e.remove());
     const n = Math.min(px, 40); if(!n) return;
     const stepZ = px / n;
@@ -325,7 +327,7 @@ select{font:inherit;font-size:14px;background:#0b0b10;color:var(--fg);border:1px
       const e = document.createElement("div"); e.className = "edge";
       const t = i / n;
       // la primera capa (lente) es apenas más clara; después, acrílico negro mate
-      const col = i === 1 ? "#34343e" : "rgb(" + Math.round(26 - 12*t) + "," + Math.round(26 - 12*t) + "," + Math.round(31 - 12*t) + ")";
+      const col = i === 1 ? "#24242c" : "rgb(" + Math.round(26 - 12*t) + "," + Math.round(26 - 12*t) + "," + Math.round(31 - 12*t) + ")";
       e.style.background = col;
       e.style.transform = "translateZ(" + (-i*stepZ).toFixed(2) + "px)";
       applyMask(e, c.maskUrl);
@@ -419,7 +421,7 @@ select{font:inherit;font-size:14px;background:#0b0b10;color:var(--fg);border:1px
         const cw = w * f.pos.w / 100, ch = cw / rr;
         slot.style.left = f.pos.x + "%"; slot.style.top = f.pos.y + "%";
         const lift = lifted.has(i) && !placing ? Math.max(30, w * 0.05) : 0;
-        slot.style.transform = "translate(-50%,-50%) translateZ(" + (0.8 + lift).toFixed(1) + "px)";
+        slot.style.transform = "translate(-50%,-50%) translateZ(" + (3 + lift).toFixed(1) + "px)";
         const c = cards.find(cc => cc.solid === slot.firstChild);
         if(c){ c.solid.style.width = cw + "px"; c.solid.style.height = ch + "px"; setEdges(c, FICHA_MM * mmPx * thickMul); }
       });
